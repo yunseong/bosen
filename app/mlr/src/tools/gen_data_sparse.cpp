@@ -30,6 +30,7 @@
 #include <random>
 #include <cstdint>
 #include <snappy.h>
+#include <limits> // Modified (probably) by Jason.
 
 
 // Generate dataset and output in libsvm (transpose) format.
@@ -55,22 +56,22 @@ namespace {
 std::vector<int> SampleWithoutReplacement(int n, int t) {
   static std::random_device rd;
   static std::mt19937 gen(rd());
-  std::uniform_int_distribution<> unif(0, n - 1);
-  std::vector<int> sample_idx(t, -1);
-  for (int num_sampled = 0; num_sampled < t; ) {
-    int sample = unif(gen);
-    int repeat = false;
-    for (int i = 0; i < num_sampled; ++i) {
-      if (sample_idx[i] == sample) {
-        repeat = true;
-        break;
-      }
-    }
-    if (!repeat) {
-      sample_idx[num_sampled++] = sample;
-    }
+
+  // Modified (probably) by Jason.
+  std::vector<int> indices(n);
+  std::vector<int> ret(t);
+  for (int i = 0; i < n; ++i) {
+    indices[i] = i;
   }
-  return sample_idx;
+
+  for (int num_sampled = 0; num_sampled < t; ++num_sampled) {
+    std::uniform_int_distribution<> unif(0, n - num_sampled - 1);
+    int sample_idx = unif(gen);
+    ret[num_sampled] = indices[sample_idx];
+    indices[sample_idx] = indices[n - num_sampled - 1];
+    indices[n - num_sampled - 1] = ret[num_sampled];
+  }
+  return ret;
 }
 
 template <typename T>
@@ -170,7 +171,8 @@ void Normalize(std::vector<float>* v) {
     l2_norm += (*v)[k] * (*v)[k];
   }
   for (int k = 0; k < v->size(); ++k) {
-    (*v)[k] /= l2_norm;
+    // Modified (probably) by Jason.
+    (*v)[k] *= 100 / sqrt(l2_norm);
   }
 }
 
@@ -201,23 +203,30 @@ int main(int argc, char* argv[]) {
   // Generate \beta.
   int64_t beta_nnz = FLAGS_feature_dim * FLAGS_beta_sparsity;
   LOG(INFO) << "beta_nnz: " << beta_nnz;
-  //auto nnz_idx = SampleWithoutReplacement(FLAGS_feature_dim, beta_nnz);
-  std::vector<int64_t> nnz_idx(beta_nnz);
-  for (int j = 0; j < beta_nnz; ++j) {
-    nnz_idx[j] = j;
+
+  // Modified (probably) by Jason.
+  std::vector<std::vector<int>  >  nnz_indices(0);
+  std::vector<std::vector<float> > beta(FLAGS_num_labels);
+  for (int l = 0; l < FLAGS_num_labels; ++l) {
+    beta[l].resize(FLAGS_feature_dim);
+    nnz_indices.push_back(SampleWithoutReplacement(FLAGS_feature_dim, beta_nnz));
+    for (int j = 0; j < beta_nnz; ++j) {
+      beta[l][nnz_indices[l][j]] = unif_minus_plus_one(gen);
+    }
   }
-  std::vector<float> beta(FLAGS_feature_dim);
-  for (int j = 0; j < nnz_idx.size(); ++j) {
-    beta[nnz_idx[j]] = unif_minus_plus_one(gen);
-  }
+
   {
     // Write beta file.
     std::stringstream ss;
-    const auto sort_beta_nnz = SortIndex(nnz_idx);
-    for (int k = 0; k < sort_beta_nnz.size(); ++k) {
-      int64_t idx = nnz_idx[sort_beta_nnz[k]];
-      ss << idx << " " << beta[idx] << std::endl;
+    for (int l = 0; l < FLAGS_num_labels; ++l) {
+      const auto sort_beta_nnz = SortIndex(nnz_idx);
+      for (int k = 0; k < sort_beta_nnz.size(); ++k) {
+        int64_t idx = nnz_idx[sort_beta_nnz[k]];
+        ss << idx << " " << beta[idx] << std::endl;
+      }
+      ss << std:endl;
     }
+
     std::string filename = FLAGS_output_file + "x"
       + std::to_string(FLAGS_num_partitions) + ".libsvm.beta";
     std::ofstream beta_out(filename);
@@ -277,12 +286,24 @@ int main(int argc, char* argv[]) {
   }
   LOG(INFO) << "Done generating design matrix.";
 
+  // Modified (probably) by Jason.
   // compute the regression value Y.
-  std::vector<float> Y(FLAGS_num_train);
+  std::vector<int32_t> labels(FLAGS_num_train);
   for (int i = 0; i < FLAGS_num_train; ++i) {
-    Y[i] = SparseDotProduct(beta, X[i]);
+    int maxLabel = 0;
+    float maxValue = SparseDotProduct(beta[0], X[i]);
+    for (int l = 1; l < FLAGS_num_labels; ++l) {
+      float candidate = SparseDotProduct(beta[l], X[i]);
+      if (candidate > maxValue) {
+        maxLabel = l;
+        maxValue = candidate;
+      }
+    }
+    labels[i] = maxLabel;
   }
 
+  // Commented out (probably) by Jason.
+  /*
   // Compute the class labels from Y.
   std::vector<float> Y_sorted = Y;
   std::sort(Y_sorted.begin(), Y_sorted.end());
@@ -292,8 +313,10 @@ int main(int argc, char* argv[]) {
     quantiles[l] = (l == FLAGS_num_labels - 1) ?
       Y_sorted[Y_sorted.size() - 1] :
       Y_sorted[(l + 1) * FLAGS_num_train / FLAGS_num_labels];
-  }
-  std::vector<int32_t> labels(FLAGS_num_train);
+      // LOG(INFO) << "Quantile " << ": " << quantiles[l] << std:endl;
+    }
+  */
+  /*
   std::uniform_int_distribution<> class_rand(0, FLAGS_num_labels - 1);
   std::uniform_real_distribution<float> unif_zero_one(0., 1.);
   for (int i = 0; i < FLAGS_num_train; ++i) {
@@ -305,11 +328,12 @@ int main(int argc, char* argv[]) {
       labels[i] = FindQuantile(quantiles, Y[i]);
     }
   }
+  */
 
   LOG(INFO) << "Generated " << FLAGS_num_train << " data. Time: "
     << total_timer.elapsed();
 
-  int num_train_per_partition = static_cast<float>(FLAGS_num_train) / 
+  int num_train_per_partition = static_cast<float>(FLAGS_num_train) /
     FLAGS_num_partitions;
   for (int ipar = 0; ipar < FLAGS_num_partitions; ++ipar) {
     int sample_begin = ipar * num_train_per_partition;
