@@ -11,8 +11,8 @@ prog = join(app_dir, "bin", "gen_data_sparse")
 # no trailing /
 prefix_path = "/dfs/dataset/mlr"
 
-num_train = int(sys.argv[1])
-num_nodes = int(sys.argv[2])
+num_train = int(sys.argv[1]) # FYI. 10000 instances -> 124MB
+num_nodes = int(sys.argv[2]) # How many nodes to run
 sparsity = 0.05 # 5 percent
 
 params = {
