@@ -219,12 +219,12 @@ int main(int argc, char* argv[]) {
     // Write beta file.
     std::stringstream ss;
     for (int l = 0; l < FLAGS_num_labels; ++l) {
-      const auto sort_beta_nnz = SortIndex(nnz_idx);
+      const auto sort_beta_nnz = SortIndex(nnz_indices[l]);
       for (int k = 0; k < sort_beta_nnz.size(); ++k) {
-        int64_t idx = nnz_idx[sort_beta_nnz[k]];
-        ss << idx << " " << beta[idx] << std::endl;
+        int64_t idx = nnz_indices[l][sort_beta_nnz[k]];
+        ss << idx << ":" << beta[l][idx] << " ";
       }
-      ss << std:endl;
+      ss << std::endl;
     }
 
     std::string filename = FLAGS_output_file + "x"
