@@ -20,7 +20,7 @@ params = {
     , "feature_dim": 20000
     , "num_partitions": num_nodes
     , "nnz_per_col": int(sparsity * num_train)
-    , "one_based": True
+    , "one_based": False
     , "beta_sparsity": 1
     , "correlation_strength": 0
     , "noise_ratio": 0
