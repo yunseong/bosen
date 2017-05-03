@@ -8,12 +8,14 @@ from os.path import join
 app_dir = dirname(dirname(os.path.realpath(__file__)))
 prog = join(app_dir, "bin", "gen_data_sparse")
 
-# no trailing /
-prefix_path = "/dfs/dataset/mlr"
-
 num_train = int(sys.argv[1]) # FYI. 10000 instances -> 124MB
 num_nodes = int(sys.argv[2]) # How many nodes to run
 sparsity = 0.05 # 5 percent
+
+# no trailing /
+prefix_path = "/dfs/dataset/mlr/{0}_{1}".format(num_train, num_nodes)
+if not os.path.exists(prefix_path):
+    os.makedirs(prefix_path)
 
 params = {
     "num_train": num_train
