@@ -47,17 +47,20 @@ print "Done killing"
 if not params["output_file_prefix"].startswith("hdfs://"):
   os.system("mkdir -p " + join(app_dir, "output"))
 """
+def execute(batch):
+  for client_id, ip in enumerate(host_ips):
+    petuum_params["client_id"] = client_id
+    cmd = ssh_cmd + ip + " "
+    cmd += "\'python " + join(app_dir, "script/run_local.py")
+    cmd += " %d %s %d\'" % (client_id, hostfile, batch)
+    cmd += " &"
+    print cmd
+    os.system(cmd)
 
-for client_id, ip in enumerate(host_ips):
-  petuum_params["client_id"] = client_id
-  cmd = ssh_cmd + ip + " "
-  cmd += "\'python " + join(app_dir, "script/run_local.py")
-  cmd += " %d %s\'" % (client_id, hostfile)
-  cmd += " &"
-  print cmd
-  os.system(cmd)
 
+    if client_id == 0:
+      print "Waiting for first client to set up"
+      time.sleep(2)
 
-  if client_id == 0:
-    print "Waiting for first client to set up"
-    time.sleep(2)
+for batch in [1]:
+  execute(batch)

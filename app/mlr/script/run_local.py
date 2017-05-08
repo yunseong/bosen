@@ -10,8 +10,8 @@ from os.path import join
 import time
 import sys
 
-if len(sys.argv) != 3:
-  print "usage: %s <client-id> <hostfile>" % sys.argv[0]
+if len(sys.argv) != 4:
+  print "usage: %s <client-id> <hostfile> <batch-size>" % sys.argv[0]
   sys.exit(1)
 
 # Please set the absolute path to app dir
@@ -21,11 +21,11 @@ client_id = sys.argv[1]
 hostfile = sys.argv[2]
 proj_dir = dirname(dirname(app_dir))
 
+num_batch = int(sys.argv[3])
 num_train = 100000
-num_partition = 25
+num_partition = 48
 train_file = "lr1000_dim20000_s{0}_nnz{1}.x{2}.libsvm.X".format(num_train, int(num_train * 0.05), num_partition)
-num_epoch = 5
-num_batch = 4
+num_epoch = 20
 output_dir = "/dfs/logs/bosen/{0}_{1}".format(num_train, num_partition)
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
